@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 public class XssSanitizerUtil {
 
 	private static List<Pattern> XSS_INPUT_PATTERNS = new ArrayList<Pattern>();
+	private static List<Pattern> XSS_INPUT_PATTERNS_SRC = new ArrayList<Pattern>();
     
 	static {
 			// Avoid anything between script tags
@@ -18,13 +19,6 @@ public class XssSanitizerUtil {
 
 			// avoid iframes
 			XSS_INPUT_PATTERNS.add(Pattern.compile("<iframe(.*?)>(.*?)</iframe>", Pattern.CASE_INSENSITIVE));
-
-			// Avoid anything in a src='...' type of expression
-			XSS_INPUT_PATTERNS.add(Pattern.compile("src[\r\n]*=[\r\n]*\\\'(.*?)\\\'", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL));
-
-			XSS_INPUT_PATTERNS.add(Pattern.compile("src[\r\n]*=[\r\n]*\\\"(.*?)\\\"", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL));
-
-			XSS_INPUT_PATTERNS.add(Pattern.compile("src[\r\n]*=[\r\n]*([^>]+)", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL));
 
 			// Remove any lonesome </script> tag
 			XSS_INPUT_PATTERNS.add(Pattern.compile("</script>", Pattern.CASE_INSENSITIVE));
@@ -46,6 +40,13 @@ public class XssSanitizerUtil {
 
 			// Avoid onload= expressions
 			XSS_INPUT_PATTERNS.add(Pattern.compile("onload(.*?)=", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL));
+
+            // Avoid anything in a src='...' type of expression
+            XSS_INPUT_PATTERNS_SRC.add(Pattern.compile("src[\r\n]*=[\r\n]*\\\'(.*?)\\\'", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL));
+
+            XSS_INPUT_PATTERNS_SRC.add(Pattern.compile("src[\r\n]*=[\r\n]*\\\"(.*?)\\\"", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL));
+
+            XSS_INPUT_PATTERNS_SRC.add(Pattern.compile("src[\r\n]*=[\r\n]*([^>]+)", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE | Pattern.DOTALL));
 	}
 
 	/**
@@ -59,17 +60,11 @@ public class XssSanitizerUtil {
 		try {
 
 			if (value != null) {
-				// NOTE: It's highly recommended to use the ESAPI library and uncomment the following line to
-				// avoid encoded attacks.
-				value = ESAPI.encoder().canonicalize(value);
+                value = removeXSSJSonly(value);
 
-				// Avoid null characters
-				value = value.replaceAll("\0", "");
-
-				// test against known XSS input patterns
-				for (Pattern xssInputPattern : XSS_INPUT_PATTERNS) {
-					value = xssInputPattern.matcher(value).replaceAll("");
-				}
+                for (Pattern xssInputPatternSrc : XSS_INPUT_PATTERNS_SRC) {
+                    value = xssInputPatternSrc.matcher(value).replaceAll("");
+                }
 			}
 
 		} catch (Exception ex) {
@@ -78,5 +73,44 @@ public class XssSanitizerUtil {
 
 		return value;
 	}
+
+    /**
+     * This method takes a string and strips out any potential script injections but leaves any src tags so images can
+     * still be
+     *
+     * @param value
+     * @return String - the new "sanitized" string.
+     */
+    public static String stripXSSNoSrc(String value) {
+
+        try {
+
+            if (value != null) {
+                value = removeXSSJSonly(value);
+            }
+
+        } catch (Exception ex) {
+            System.out.println("Could not strip XSS from value = " + value + " | ex = " + ex.getMessage());
+        }
+
+        return value;
+    }
+
+    private static String removeXSSJSonly(String value) {
+        // NOTE: It's highly recommended to use the ESAPI library and uncomment the following line to
+        // avoid encoded attacks.
+        value = ESAPI.encoder().canonicalize(value);
+
+        // Avoid null characters
+        value = value.replaceAll("\0", "");
+
+        // test against known XSS input patterns
+        for (Pattern xssInputPattern : XSS_INPUT_PATTERNS) {
+            value = xssInputPattern.matcher(value).replaceAll("");
+        }
+
+        return value;
+    }
+
 
 }
